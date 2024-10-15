@@ -1,0 +1,153 @@
+#include <TFT_eSPI.h>     // Biblioteca para o display TFT
+#include <WiFi.h>         // Biblioteca de WiFi
+#include <BluetoothSerial.h>  // Biblioteca para Bluetooth
+#include <TouchScreen.h>  // Biblioteca para a funcionalidade de toque
+
+// Configurações do display TFT
+TFT_eSPI tft = TFT_eSPI();  // Inicializa o display
+TouchScreen ts = TouchScreen();  // Inicializa o toque (dependendo do driver do seu display)
+
+// Variáveis para o touchscreen
+#define MINPRESSURE 10
+#define MAXPRESSURE 1000
+int screenWidth = 320;
+int screenHeight = 240;
+
+// Configurações de WiFi
+const char* ssid = "WIFI_NETWORK";  // SSID para teste
+const char* password = "PASSWORD";  // Senha do WiFi
+
+BluetoothSerial SerialBT;  // Objeto para Bluetooth
+
+// Definição de botões na tela
+struct Button {
+  int x, y, w, h;
+  String label;
+};
+
+// Botões na interface
+Button wifiScanBtn = {20, 50, 120, 50, "Scan WiFi"};
+Button deauthBtn = {160, 50, 120, 50, "Deauth WiFi"};
+Button btScanBtn = {20, 120, 120, 50, "Scan BT"};
+Button exitBtn = {160, 120, 120, 50, "Exit"};
+
+// Função para desenhar botões
+void drawButton(Button btn) {
+  tft.fillRect(btn.x, btn.y, btn.w, btn.h, TFT_WHITE);
+  tft.drawRect(btn.x, btn.y, btn.w, btn.h, TFT_BLACK);
+  tft.setCursor(btn.x + 10, btn.y + 20);
+  tft.setTextColor(TFT_BLACK);
+  tft.setTextSize(2);
+  tft.print(btn.label);
+}
+
+// Função de inicialização
+void setup() {
+  Serial.begin(115200);
+  
+  // Inicia o display
+  tft.init();
+  tft.setRotation(1);  // Rotação da tela
+  tft.fillScreen(TFT_BLACK);
+  
+  // Desenha a interface de botões
+  drawButton(wifiScanBtn);
+  drawButton(deauthBtn);
+  drawButton(btScanBtn);
+  drawButton(exitBtn);
+
+  // Inicia o WiFi e Bluetooth
+  WiFi.mode(WIFI_STA);  // Modo estação para escanear redes WiFi
+  SerialBT.begin("ESP32_BT_MARAUDER");  // Inicializa o Bluetooth Serial
+}
+
+// Função principal
+void loop() {
+  TSPoint p = ts.getPoint();  // Captura o toque na tela
+
+  if (p.z > MINPRESSURE && p.z < MAXPRESSURE) {
+    // Converte coordenadas para o display
+    int touchX = map(p.x, TS_MINX, TS_MAXX, 0, screenWidth);
+    int touchY = map(p.y, TS_MINY, TS_MAXY, 0, screenHeight);
+
+    // Verifica se o botão Scan WiFi foi pressionado
+    if (touchX > wifiScanBtn.x && touchX < wifiScanBtn.x + wifiScanBtn.w &&
+        touchY > wifiScanBtn.y && touchY < wifiScanBtn.y + wifiScanBtn.h) {
+      scanWiFiNetworks();  // Chama função de escanear redes WiFi
+    }
+
+    // Verifica se o botão Deauth WiFi foi pressionado
+    if (touchX > deauthBtn.x && touchX < deauthBtn.x + deauthBtn.w &&
+        touchY > deauthBtn.y && touchY < deauthBtn.y + deauthBtn.h) {
+      deauthWiFi();  // Chama função de desautenticação
+    }
+
+    // Verifica se o botão Scan Bluetooth foi pressionado
+    if (touchX > btScanBtn.x && touchX < btScanBtn.x + btScanBtn.w &&
+        touchY > btScanBtn.y && touchY < btScanBtn.y + btScanBtn.h) {
+      scanBluetoothDevices();  // Chama função de escanear dispositivos Bluetooth
+    }
+
+    // Verifica se o botão Exit foi pressionado
+    if (touchX > exitBtn.x && touchX < exitBtn.x + exitBtn.w &&
+        touchY > exitBtn.y && touchY < exitBtn.y + exitBtn.h) {
+      tft.fillScreen(TFT_BLACK);  // Limpa a tela
+      Serial.println("Exiting...");
+      delay(500);  // Simula uma saída do programa
+    }
+  }
+}
+
+// Função para escanear redes WiFi
+void scanWiFiNetworks() {
+  tft.fillScreen(TFT_BLACK);  // Limpa a tela para exibir os resultados
+  tft.setCursor(10, 10);
+  tft.setTextColor(TFT_WHITE);
+  tft.setTextSize(2);
+  tft.println("Scanning for WiFi...");
+
+  int n = WiFi.scanNetworks();
+  if (n == 0) {
+    tft.println("No networks found");
+  } else {
+    for (int i = 0; i < n; i++) {
+      tft.print(WiFi.SSID(i));
+      tft.print(" (");
+      tft.print(WiFi.RSSI(i));
+      tft.println(" dBm)");
+    }
+  }
+  delay(5000);  // Espera 5 segundos antes de voltar à tela inicial
+  setup();  // Redesenha a interface principal
+}
+
+// Função para desautenticar dispositivos WiFi
+void deauthWiFi() {
+  // Aqui você pode implementar uma função de desautenticação
+  tft.fillScreen(TFT_BLACK);
+  tft.setCursor(10, 10);
+  tft.setTextColor(TFT_RED);
+  tft.setTextSize(2);
+  tft.println("Deauth Attack!");
+  // Enviar pacotes de deautenticação (deve ser implementado com a biblioteca apropriada)
+  delay(3000);  // Exibe a mensagem por 3 segundos
+  setup();  // Redesenha a interface principal
+}
+
+// Função para escanear dispositivos Bluetooth
+void scanBluetoothDevices() {
+  tft.fillScreen(TFT_BLACK);
+  tft.setCursor(10, 10);
+  tft.setTextColor(TFT_WHITE);
+  tft.setTextSize(2);
+  tft.println("Scanning for BT...");
+
+  // Exemplo básico de escanear dispositivos Bluetooth
+  if (SerialBT.hasClient()) {
+    tft.println("BT client connected");
+  } else {
+    tft.println("No BT clients found");
+  }
+  delay(5000);  // Espera 5 segundos antes de voltar à tela inicial
+  setup();  // Redesenha a interface principal
+}
